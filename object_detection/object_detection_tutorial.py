@@ -19,7 +19,7 @@ import zipfile
 
 from collections import defaultdict
 from io import StringIO
-from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 from PIL import Image
 #from object_detection.utils import ops as utils_ops
 
@@ -33,7 +33,7 @@ from PIL import Image
 
 
 # This is needed to display the images.
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 # This is needed since the notebook is stored in the object_detection folder.
 sys.path.append("..")
@@ -214,6 +214,6 @@ for image_path in TEST_IMAGE_PATHS:
       instance_masks=output_dict.get('detection_masks'),
       use_normalized_coordinates=True,
       line_thickness=8)
-  plt.figure(figsize=IMAGE_SIZE)
-  plt.imshow(image_np)
+  #plt.figure(figsize=IMAGE_SIZE)
+  #plt.imshow(image_np)
 

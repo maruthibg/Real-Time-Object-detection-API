@@ -8,11 +8,11 @@ import zipfile
 
 from collections import defaultdict
 from io import StringIO
-from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 from PIL import Image
 
 import cv2
-path = r'C:\Users\govindareddy\Downloads\VID_20180612_165108.mp4'
+path = '/opt/videoupload/VID_20180613_124038.mp4'
 cap = cv2.VideoCapture(r'%s' % (path))
 
 # This is needed since the notebook is stored in the object_detection folder.
@@ -134,3 +134,4 @@ with detection_graph.as_default():
           cv2.destroyAllWindows()
           break
       print(result)
+      break
