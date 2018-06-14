@@ -63,9 +63,11 @@ if __name__ == '__main__':
   ap = argparse.ArgumentParser()
   ap.add_argument("-p", "--path", required=True, help="path to input video")
   ap.add_argument("-e", "--enable_imshow", required=False, help="Enable Imshow")
+  ap.add_argument("-i", "--object_of_interest", required=False, help="Object of interest")
   args = vars(ap.parse_args())
   path = args["path"]
   enable_imshow = int(args.get("enable_imshow", '0'))
+  ooi = args["object_of_interest"]
   #path = r'C:\Users\govindareddy\Downloads\VID_20180612_165108.mp4'
   cap = cv2.VideoCapture(r'%s' % (path))
 
@@ -107,5 +109,7 @@ if __name__ == '__main__':
             cv2.destroyAllWindows()
             break
         else:
-          print(result)
-          break
+          if type(result) is str:
+            print('Objects being identified - %s'%result)
+            print(result)
+            break
