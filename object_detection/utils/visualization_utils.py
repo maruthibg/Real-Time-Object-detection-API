@@ -542,7 +542,7 @@ def visualize_boxes_and_labels_on_image_array(
     groundtruth_box_visualization_color='black',
     skip_scores=False,
     skip_labels=False,
-    display_string=False):
+    enable_imshow=True):
   """Overlay labeled boxes on an image with formatted scores and label names.
 
   This function groups boxes that correspond to the same location
@@ -612,7 +612,7 @@ def visualize_boxes_and_labels_on_image_array(
             else:
               class_name = 'N/A'
             display_str = str(class_name)
-            if display_string:
+            if not enable_imshow:
                return display_str
         if not skip_scores:
           if not display_str:
