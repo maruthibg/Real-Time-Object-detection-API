@@ -110,6 +110,5 @@ if __name__ == '__main__':
             break
         else:
           if type(result) is str:
-            print('Objects being identified - %s'%result)
             print(result)
             break
