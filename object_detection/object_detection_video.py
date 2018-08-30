@@ -1,114 +1,170 @@
-import numpy as np
+"""Demo for use yolo v3
+"""
 import os
-import six.moves.urllib as urllib
-import sys
-import tarfile
-import tensorflow as tf
+import time
 import cv2
-import argparse
-
-from utils import label_map_util
-from utils import visualization_utils as vis_util
-
-# Size, in inches, of the output images.
-IMAGE_SIZE = (12, 8)
-
-# What model to download.
-MODEL_NAME = 'ssd_mobilenet_v1_coco_11_06_2017'
-MODEL_FILE = MODEL_NAME + '.tar.gz'
-DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
-
-# Path to frozen detection graph. This is the actual model that is used for the object detection.
-PATH_TO_CKPT = MODEL_NAME + '/frozen_inference_graph.pb'
-
-# List of the strings that is used to add correct label for each box.
-PATH_TO_LABELS = os.path.join('data', 'mscoco_label_map.pbtxt')
-NUM_CLASSES = 90
-
-# ## Download Model
-opener = urllib.request.URLopener()
-opener.retrieve(DOWNLOAD_BASE + MODEL_FILE, MODEL_FILE)
-tar_file = tarfile.open(MODEL_FILE)
-for file in tar_file.getmembers():
-  file_name = os.path.basename(file.name)
-  if 'frozen_inference_graph.pb' in file_name:
-    tar_file.extract(file, os.getcwd())
+import numpy as np
+from model.yolo_model import YOLO
 
 
-# ## Load a (frozen) Tensorflow model into memory.
+def process_image(img):
+    """Resize, reduce and expand image.
 
-detection_graph = tf.Graph()
-with detection_graph.as_default():
-  od_graph_def = tf.GraphDef()
-  with tf.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
-    serialized_graph = fid.read()
-    od_graph_def.ParseFromString(serialized_graph)
-    tf.import_graph_def(od_graph_def, name='')
+    # Argument:
+        img: original image.
 
-# ## Loading label map
-# Label maps map indices to category names, so that when our convolution network predicts `5`, we know that this corresponds to `airplane`.  Here we use internal utility functions, but anything that returns a dictionary mapping integers to appropriate string labels would be fine
+    # Returns
+        image: ndarray(64, 64, 3), processed image.
+    """
+    image = cv2.resize(img, (416, 416),
+                       interpolation=cv2.INTER_CUBIC)
+    image = np.array(image, dtype='float32')
+    image /= 255.
+    image = np.expand_dims(image, axis=0)
+
+    return image
 
 
-label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
-categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES, use_display_name=True)
-category_index = label_map_util.create_category_index(categories)
+def get_classes(file):
+    """Get classes name.
 
-def load_image_into_numpy_array(image):
-  (im_width, im_height) = image.size
-  return np.array(image.getdata()).reshape(
-      (im_height, im_width, 3)).astype(np.uint8)
+    # Argument:
+        file: classes name for database.
+
+    # Returns
+        class_names: List, classes name.
+
+    """
+    with open(file) as f:
+        class_names = f.readlines()
+    class_names = [c.strip() for c in class_names]
+
+    return class_names
+
+
+def draw(image, boxes, scores, classes, all_classes):
+    """Draw the boxes on the image.
+
+    # Argument:
+        image: original image.
+        boxes: ndarray, boxes of objects.
+        classes: ndarray, classes of objects.
+        scores: ndarray, scores of objects.
+        all_classes: all classes name.
+    """
+    classes_present = []
+    scores_percent = []
+    for box, score, cl in zip(boxes, scores, classes):
+        x, y, w, h = box
+
+        top = max(0, np.floor(x + 0.5).astype(int))
+        left = max(0, np.floor(y + 0.5).astype(int))
+        right = min(image.shape[1], np.floor(x + w + 0.5).astype(int))
+        bottom = min(image.shape[0], np.floor(y + h + 0.5).astype(int))
+
+        cv2.rectangle(image, (top, left), (right, bottom), (255, 0, 0), 2)
+        cv2.putText(image, '{0} {1:.2f}'.format(all_classes[cl], score),
+                    (top, left - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6, (0, 0, 255), 1,
+                    cv2.LINE_AA)
+
+        #print('class: {0}, score: {1:.2f}'.format(all_classes[cl], score))
+        #print('box coordinate x,y,w,h: {0}'.format(box))
+        classes_present.append(all_classes[cl])
+        scores_percent.append(score)
+        
+
+    return {'class':classes_present, 'score': scores_percent}
+
+
+def detect_image(image, yolo, all_classes):
+    """Use yolo v3 to detect images.
+
+    # Argument:
+        image: original image.
+        yolo: YOLO, yolo model.
+        all_classes: all classes name.
+
+    # Returns:
+        image: processed image.
+    """
+    pimage = process_image(image)
+
+    start = time.time()
+    boxes, classes, scores = yolo.predict(pimage, image.shape)
+    end = time.time()
+
+    print('time: {0:.2f}s'.format(end - start))
+
+    if boxes is not None:
+        score = draw(image, boxes, scores, classes, all_classes)
+
+    return score
+
+
+def detect_video(video_path, yolo, all_classes):
+    """Use yolo v3 to detect video.
+
+    # Argument:
+        video: video file.
+        yolo: YOLO, yolo model.
+        all_classes: all classes name.
+    """
+    #video_path = os.path.join("videos", "test", video)
+    camera = cv2.VideoCapture(video_path)
+    #cv2.namedWindow("detection", cv2.WINDOW_AUTOSIZE)
+
+    ## Prepare for saving the detected video
+    #sz = (int(camera.get(cv2.CAP_PROP_FRAME_WIDTH)),
+    #    int(camera.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    #fourcc = cv2.VideoWriter_fourcc(*'mpeg')
+
+    
+    #vout = cv2.VideoWriter()
+    #vout.open(os.path.join("videos", "res", video), fourcc, 20, sz, True)
+
+    while True:
+        res, frame = camera.read()
+
+        if not res:
+            break
+
+        result = detect_image(frame, yolo, all_classes)
+        print(result)
+        #cv2.imshow("detection", image)
+
+        # Save the video frame by frame
+        #vout.write(image)
+
+        #if cv2.waitKey(110) & 0xff == 27:
+        #        break
+
+    #vout.release()
+    camera.release()
+    
+
 
 if __name__ == '__main__':
-  # construct the argument parser and parse the arguments
-  ap = argparse.ArgumentParser()
-  ap.add_argument("-p", "--path", required=True, help="path to input video")
-  ap.add_argument("-e", "--enable_imshow", required=False, help="Enable Imshow")
-  ap.add_argument("-i", "--object_of_interest", required=False, help="Object of interest")
-  args = vars(ap.parse_args())
-  path = args["path"]
-  enable_imshow = int(args.get("enable_imshow", '0'))
-  ooi = args["object_of_interest"]
-  #path = r'C:\Users\govindareddy\Downloads\VID_20180612_165108.mp4'
-  cap = cv2.VideoCapture(r'%s' % (path))
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-p", "--path", required=True, help="path to input video")
+    args = vars(ap.parse_args())
+    path = args["path"]     
+    yolo = YOLO(0.6, 0.5)
+    file = 'data/coco_classes.txt'
+    all_classes = get_classes(file)   
 
-  with detection_graph.as_default():
-    with tf.Session(graph=detection_graph) as sess:
-      while True:
-        ret, image_np = cap.read()
-        # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-        image_np_expanded = np.expand_dims(image_np, axis=0)
-        image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
-        # Each box represents a part of the image where a particular object was detected.
-        boxes = detection_graph.get_tensor_by_name('detection_boxes:0')
-        # Each score represent how level of confidence for each of the objects.
-        # Score is shown on the result image, together with the class label.
-        scores = detection_graph.get_tensor_by_name('detection_scores:0')
-        classes = detection_graph.get_tensor_by_name('detection_classes:0')
-        num_detections = detection_graph.get_tensor_by_name('num_detections:0')
-        # Actual detection.
-        (boxes, scores, classes, num_detections) = sess.run(
-            [boxes, scores, classes, num_detections],
-            feed_dict={image_tensor: image_np_expanded})
-        # Visualization of the results of a detection.
-        result = vis_util.visualize_boxes_and_labels_on_image_array(
-            image_np,
-            np.squeeze(boxes),
-            np.squeeze(classes).astype(np.int32),
-            np.squeeze(scores),
-            category_index,
-            use_normalized_coordinates=True,
-            line_thickness=8,
-            enable_imshow=enable_imshow
-        )
-        if enable_imshow:
-          from matplotlib import pyplot as plt
-          plt.figure(figsize=IMAGE_SIZE)
-          plt.imshow(image_np)        
-          cv2.imshow('object detection', cv2.resize(image_np, (800,600)))
-          if cv2.waitKey(25) & 0xFF == ord('q'):
-            cv2.destroyAllWindows()
-            break
-        else:
-          if type(result) is str:
-            print(result)
-            break
+    """
+    # detect images in test floder.
+    for (root, dirs, files) in os.walk('images/test'):
+        if files:
+            for f in files:
+                print(f)
+                path = os.path.join(root, f)
+                image = cv2.imread(path)
+                image = detect_image(image, yolo, all_classes)
+                cv2.imwrite('images/res/' + f, image)
+    """
+    # detect videos one at a time in videos/test folder    
+    video = r'%s' % (path)
+    detect_video(video, yolo, all_classes)
